@@ -4,10 +4,7 @@ import {
   MessageCircle, 
   Search, 
   Target, 
-  Users, 
   Award, 
-  TrendingUp,
-  CheckCircle,
   ArrowRight
 } from 'lucide-react';
 

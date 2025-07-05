@@ -77,7 +77,6 @@ const ProfileProgress: React.FC<ProfileProgressProps> = ({
   const completedRequired = profileFields.filter(field => field.required && field.value).length;
   const totalRequired = profileFields.filter(field => field.required).length;
   const completedOptional = profileFields.filter(field => !field.required && field.value).length;
-  const totalOptional = profileFields.filter(field => !field.required).length;
   
   const overallProgress = ((completedRequired + completedOptional) / profileFields.length) * 100;
   const requiredProgress = (completedRequired / totalRequired) * 100;

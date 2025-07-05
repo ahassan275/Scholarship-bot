@@ -4,6 +4,7 @@ import WelcomeScreen from './WelcomeScreen';
 import ChatInterface from './ChatInterface';
 import ProfileProgress from './ProfileProgress';
 import { ConversationState, UserProfile, Message } from '../types';
+import { api, ApiError } from '../utils/api';
 
 const ScholarshipAgent: React.FC = () => {
   const [showWelcome, setShowWelcome] = useState(true);
@@ -21,64 +22,41 @@ const ScholarshipAgent: React.FC = () => {
   });
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
 
-  // Simulate agent response (replace with actual API call)
-  const simulateAgentResponse = async (userInput: string): Promise<string> => {
+  // API call to get agent response
+  const getAgentResponse = async (userInput: string): Promise<{ response: string; newSessionId?: string }> => {
     setIsTyping(true);
+    setApiError(null);
     
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
-    
-    // Mock responses based on conversation state
-    if (conversationState === 'profiling') {
-      if (!userProfile.field_of_study) {
-        return "Hello! I'm your AI scholarship advisor. I'm here to help you find personalized scholarship opportunities. Let's start by getting to know you better. What field of study are you interested in or currently pursuing?";
-      } else if (!userProfile.education_level) {
-        return "Great choice! What's your current education level? (e.g., High School, Undergraduate, Graduate, PhD)";
-      } else if (!userProfile.citizenship) {
-        return "What is your citizenship/nationality? This is crucial as scholarships have specific eligibility requirements based on citizenship.";
-      } else if (!userProfile.location) {
-        return "Where are you located or planning to study? This helps me find location-specific opportunities.";
-      } else {
-        setConversationState('searching');
-        return "Perfect! I have enough information. Let me search for relevant scholarships for you...";
+    try {
+      const result = await api.sendMessage(userInput, sessionId || undefined);
+      
+      // Update session ID if this is a new session
+      if (!sessionId) {
+        setSessionId(result.session_id);
       }
-    } else if (conversationState === 'searching') {
-      setConversationState('responding');
-      return `## 🎯 Scholarships for ${userProfile.citizenship} Citizens
-
-**1. Global Excellence Scholarship**
-- Amount: $15,000 - $25,000
-- Deadline: March 15, 2024
-- Eligibility: International students in ${userProfile.field_of_study}
-- [Source: university-scholarships.org]
-
-**2. Future Leaders Grant**
-- Amount: $10,000
-- Deadline: April 30, 2024
-- Eligibility: ${userProfile.citizenship} citizens studying ${userProfile.field_of_study}
-- [Source: education-foundation.org]
-
-**3. Academic Merit Award**
-- Amount: $5,000 - $12,000
-- Deadline: May 15, 2024
-- Eligibility: Students in ${userProfile.location} region
-- [Source: regional-education.gov]
-
-## 📋 Application Guidance
-- Start with your personal statement highlighting your passion for ${userProfile.field_of_study}
-- Gather transcripts and recommendation letters
-- Prepare for potential interviews
-
-## ⏰ Next Steps
-1. Visit the official websites to verify eligibility
-2. Start working on your personal statement
-3. Contact your professors for recommendation letters
-
-Would you like me to provide detailed application support for any of these scholarships? (Yes/No)`;
+      
+      // Update conversation state and user profile from API response
+      setConversationState(result.conversation_state as ConversationState);
+      setUserProfile(result.user_profile);
+      
+      return {
+        response: result.response,
+        newSessionId: result.session_id
+      };
+    } catch (error) {
+      console.error('API call failed:', error);
+      
+      if (error instanceof ApiError) {
+        setApiError(`API Error (${error.status}): ${error.message}`);
+      } else {
+        setApiError('Network error. Please check your connection and try again.');
+      }
+      
+      throw error;
     }
-    
-    return "I'm here to help! Feel free to ask me anything about scholarships or your application process.";
   };
 
   const handleSendMessage = async (content: string) => {
@@ -91,12 +69,9 @@ Would you like me to provide detailed application support for any of these schol
     };
     setMessages(prev => [...prev, userMessage]);
 
-    // Update user profile based on input (simplified extraction)
-    updateProfileFromInput(content);
-
     // Get agent response
     try {
-      const response = await simulateAgentResponse(content);
+      const { response } = await getAgentResponse(content);
       setIsTyping(false);
       
       const agentMessage: Message = {
@@ -111,7 +86,7 @@ Would you like me to provide detailed application support for any of these schol
       setIsTyping(false);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: 'I apologize, but I encountered an error. Please try again.',
+        content: apiError || 'I apologize, but I encountered an error. Please try again.',
         sender: 'agent',
         timestamp: new Date(),
         type: 'error',
@@ -120,67 +95,101 @@ Would you like me to provide detailed application support for any of these schol
     }
   };
 
-  const updateProfileFromInput = (input: string) => {
-    const lowerInput = input.toLowerCase();
-    
-    // Simple keyword-based profile extraction (replace with actual LLM extraction)
-    if (!userProfile.field_of_study) {
-      if (lowerInput.includes('computer science') || lowerInput.includes('cs')) {
-        setUserProfile(prev => ({ ...prev, field_of_study: 'Computer Science' }));
-      } else if (lowerInput.includes('engineering')) {
-        setUserProfile(prev => ({ ...prev, field_of_study: 'Engineering' }));
-      } else if (lowerInput.includes('business')) {
-        setUserProfile(prev => ({ ...prev, field_of_study: 'Business' }));
-      } else if (lowerInput.includes('medicine') || lowerInput.includes('medical')) {
-        setUserProfile(prev => ({ ...prev, field_of_study: 'Medicine' }));
-      }
+  // Session persistence - save session ID to localStorage
+  useEffect(() => {
+    const savedSessionId = localStorage.getItem('scholarship-agent-session');
+    if (savedSessionId) {
+      setSessionId(savedSessionId);
     }
-    
-    if (!userProfile.education_level) {
-      if (lowerInput.includes('undergraduate') || lowerInput.includes('bachelor')) {
-        setUserProfile(prev => ({ ...prev, education_level: 'Undergraduate' }));
-      } else if (lowerInput.includes('graduate') || lowerInput.includes('master')) {
-        setUserProfile(prev => ({ ...prev, education_level: 'Graduate' }));
-      } else if (lowerInput.includes('phd') || lowerInput.includes('doctorate')) {
-        setUserProfile(prev => ({ ...prev, education_level: 'PhD' }));
-      } else if (lowerInput.includes('high school')) {
-        setUserProfile(prev => ({ ...prev, education_level: 'High School' }));
-      }
-    }
-    
-    if (!userProfile.citizenship) {
-      const countries = ['canadian', 'american', 'indian', 'chinese', 'british', 'german', 'french'];
-      countries.forEach(country => {
-        if (lowerInput.includes(country)) {
-          setUserProfile(prev => ({ ...prev, citizenship: country.charAt(0).toUpperCase() + country.slice(1) }));
-        }
-      });
-    }
-    
-    if (!userProfile.location) {
-      const locations = ['canada', 'usa', 'india', 'uk', 'germany', 'france', 'australia'];
-      locations.forEach(location => {
-        if (lowerInput.includes(location)) {
-          setUserProfile(prev => ({ ...prev, location: location.charAt(0).toUpperCase() + location.slice(1) }));
-        }
-      });
-    }
-  };
+  }, []);
 
-  const handleStartChat = () => {
-    setShowWelcome(false);
-    // Add initial greeting message
-    const welcomeMessage: Message = {
-      id: 'welcome',
-      content: "Hello! I'm your AI scholarship advisor. I'm here to help you find personalized scholarship opportunities. Let's start by getting to know you better. What field of study are you interested in or currently pursuing?",
-      sender: 'agent',
-      timestamp: new Date(),
+  useEffect(() => {
+    if (sessionId) {
+      localStorage.setItem('scholarship-agent-session', sessionId);
+    }
+  }, [sessionId]);
+
+  // Health check on component mount
+  useEffect(() => {
+    const checkApiHealth = async () => {
+      try {
+        await api.healthCheck();
+      } catch (error) {
+        console.warn('API health check failed:', error);
+        setApiError('Unable to connect to the scholarship agent service. Please try again later.');
+      }
     };
-    setMessages([welcomeMessage]);
+    
+    checkApiHealth();
+  }, []);
+
+  const handleStartChat = async () => {
+    setShowWelcome(false);
+    
+    // Get initial greeting from API if no session exists
+    try {
+      if (!sessionId) {
+        const { response } = await getAgentResponse('Hello');
+        setIsTyping(false);
+        
+        const welcomeMessage: Message = {
+          id: 'welcome',
+          content: response,
+          sender: 'agent',
+          timestamp: new Date(),
+        };
+        setMessages([welcomeMessage]);
+      } else {
+        // If session exists, just show a generic greeting
+        const welcomeMessage: Message = {
+          id: 'welcome',
+          content: "Welcome back! I'm your AI scholarship advisor. How can I help you today?",
+          sender: 'agent',
+          timestamp: new Date(),
+        };
+        setMessages([welcomeMessage]);
+      }
+    } catch (error) {
+      setIsTyping(false);
+      // Fallback to generic greeting on error
+      const welcomeMessage: Message = {
+        id: 'welcome',
+        content: "Hello! I'm your AI scholarship advisor. I'm here to help you find personalized scholarship opportunities. Let's start by getting to know you better. What field of study are you interested in or currently pursuing?",
+        sender: 'agent',
+        timestamp: new Date(),
+      };
+      setMessages([welcomeMessage]);
+    }
   };
 
   return (
     <div className="max-w-7xl mx-auto">
+      {/* API Error Banner */}
+      {apiError && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg"
+        >
+          <div className="flex items-center">
+            <div className="flex-shrink-0 w-5 h-5 text-red-500">⚠️</div>
+            <div className="ml-3">
+              <p className="text-sm font-medium">{apiError}</p>
+            </div>
+            <div className="ml-auto pl-3">
+              <button
+                onClick={() => setApiError(null)}
+                className="inline-flex text-red-400 hover:text-red-600"
+              >
+                <span className="sr-only">Dismiss</span>
+                ✕
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+      
       <AnimatePresence mode="wait">
         {showWelcome ? (
           <WelcomeScreen key="welcome" onStartChat={handleStartChat} />
