@@ -74,9 +74,9 @@ const ProfileProgress: React.FC<ProfileProgressProps> = ({
     }
   ];
 
-  const completedRequired = profileFields.filter(field => field.required && field.value).length;
+  const completedRequired = profileFields.filter(field => field.required && field.value && field.value.trim() !== '').length;
   const totalRequired = profileFields.filter(field => field.required).length;
-  const completedOptional = profileFields.filter(field => !field.required && field.value).length;
+  const completedOptional = profileFields.filter(field => !field.required && field.value && field.value.trim() !== '').length;
   
   const overallProgress = ((completedRequired + completedOptional) / profileFields.length) * 100;
   const requiredProgress = (completedRequired / totalRequired) * 100;
@@ -181,7 +181,7 @@ const ProfileProgress: React.FC<ProfileProgressProps> = ({
               className="flex items-center space-x-3 p-3 rounded-lg hover:bg-white/50 transition-colors"
             >
               <div className={`p-2 rounded-lg ${
-                field.value 
+                field.value && field.value.trim() !== ''
                   ? 'bg-success-100 text-success-600' 
                   : field.required 
                     ? 'bg-warning-100 text-warning-600'
@@ -201,14 +201,14 @@ const ProfileProgress: React.FC<ProfileProgressProps> = ({
                     </span>
                   )}
                 </div>
-                {field.value ? (
+                {field.value && field.value.trim() !== '' ? (
                   <p className="text-sm text-gray-600 truncate">{field.value}</p>
                 ) : (
                   <p className="text-sm text-gray-400">Not provided</p>
                 )}
               </div>
               
-              {field.value ? (
+              {field.value && field.value.trim() !== '' ? (
                 <CheckCircle className="h-5 w-5 text-success-500 flex-shrink-0" />
               ) : (
                 <Circle className="h-5 w-5 text-gray-300 flex-shrink-0" />

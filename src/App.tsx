@@ -9,7 +9,7 @@ function App() {
       <Header />
       
       <motion.main 
-        className="flex-1 container mx-auto px-4 py-8"
+        className="flex-1 flex flex-col container mx-auto px-4 py-8"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}

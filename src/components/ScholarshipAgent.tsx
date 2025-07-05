@@ -192,7 +192,7 @@ const ScholarshipAgent: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="flex flex-col h-full max-w-7xl mx-auto">
       {/* API Error Banner */}
       {apiError && (
         <motion.div
@@ -262,7 +262,7 @@ const ScholarshipAgent: React.FC = () => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.3 }}
-            className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-200px)]"
+            className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6"
           >
             {/* Profile Progress Sidebar */}
             <div className="lg:col-span-1">
@@ -273,7 +273,7 @@ const ScholarshipAgent: React.FC = () => {
             </div>
             
             {/* Chat Interface */}
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-3 flex flex-col">
               <ChatInterface
                 messages={messages}
                 onSendMessage={handleSendMessage}

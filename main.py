@@ -271,23 +271,32 @@ class ScholarshipBot:
     def _extract_profile_info(self, user_input: str):
         """Extract profile information from user input using LLM"""
         
+        print(f"🔍 Extracting profile info from: '{user_input}'")
+        
         extraction_prompt = f"""
-        Extract profile information from this user input: "{user_input}"
+        You are a data extraction assistant. Extract profile information from user input and return ONLY valid JSON.
+
+        User input: "{user_input}"
         
-        Current profile: {self.user_profile.to_search_context()}
-        
-        Return ONLY a JSON object with any new information found. Use these exact keys:
-        - field_of_study
-        - education_level  
-        - gpa
-        - location
-        - citizenship
-        - financial_need
-        - research_interests (array)
-        - career_goals
-        - extracurriculars (array)
-        
-        If no new information is found, return empty JSON {{}}.
+        Extract any information that matches these fields and return it as a JSON object:
+        - field_of_study (string): any academic field, major, or subject of study
+        - education_level (string): undergraduate, graduate, master's, PhD, bachelor's, etc.
+        - gpa (number): any grade point average mentioned
+        - location (string): any country, city, region, or place mentioned
+        - citizenship (string): any nationality, citizenship, or country of origin
+        - financial_need (string): any mention of funding needs, scholarships, or financial situation
+        - research_interests (array): any research topics, areas of interest, or academic focuses
+        - career_goals (string): any career aspirations, professional goals, or future plans
+        - extracurriculars (array): any activities, projects, clubs, or experiences outside academics
+
+        Guidelines:
+        - Extract information as mentioned by the user, don't assume or add details
+        - Use the exact terms the user provides when possible
+        - For arrays, include individual items mentioned
+        - Return only fields that have actual information from the input
+        - If no relevant information is found, return {{}}
+
+        Return ONLY the JSON object with extracted information.
         """
         
         try:
@@ -300,19 +309,28 @@ class ScholarshipBot:
             )
             
             result = conversation.predict(input="extract")
+            print(f"📤 LLM extraction result: {result}")
             
             # Try to parse JSON and update profile
             try:
                 extracted_data = json.loads(result.strip())
+                print(f"✅ Parsed JSON: {extracted_data}")
+                
                 for key, value in extracted_data.items():
                     if hasattr(self.user_profile, key) and value:
                         if isinstance(value, list):
                             current_list = getattr(self.user_profile, key) or []
                             updated_list = list(set(current_list + value))
                             setattr(self.user_profile, key, updated_list)
+                            print(f"📝 Updated {key} (list): {updated_list}")
                         else:
                             setattr(self.user_profile, key, value)
-            except json.JSONDecodeError:
+                            print(f"📝 Updated {key}: {value}")
+                            
+                print(f"🔄 Profile after update: {self.user_profile.to_search_context()}")
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON parsing failed: {e}")
+                print(f"Raw result: {result}")
                 pass  # Continue without extraction if JSON parsing fails
                 
         except Exception as e:
