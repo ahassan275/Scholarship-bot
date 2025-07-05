@@ -38,7 +38,7 @@ source venv/bin/activate
 # Check if Python dependencies are installed
 if ! python -c "import fastapi" 2>/dev/null; then
     echo "📦 Installing Python dependencies..."
-    pip install -r requirements.txt
+    python -m pip install -r requirements.txt
 fi
 
 # Check if Node dependencies are installed

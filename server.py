@@ -15,10 +15,10 @@ load_dotenv()
 
 app = FastAPI(title="Scholarship Agent API", version="1.0.0")
 
-# CORS configuration
+# CORS configuration - Allow all origins for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # React dev server
+    allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -115,6 +115,19 @@ def user_profile_to_dict(profile: UserProfile) -> Dict[str, Any]:
         'career_goals': profile.career_goals,
     }
 
+@app.get("/", response_model=dict)
+async def root():
+    """Root endpoint"""
+    return {
+        "message": "Scholarship Agent API",
+        "version": "1.0.0",
+        "endpoints": {
+            "health": "/health",
+            "chat": "/chat",
+            "docs": "/docs"
+        }
+    }
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
@@ -169,6 +182,7 @@ async def chat_endpoint(request: ChatRequest):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/profile/{session_id}", response_model=ProfileResponse)
@@ -226,16 +240,31 @@ async def get_session_stats():
 if __name__ == "__main__":
     import uvicorn
     
+    # Check if .env file exists
+    if not os.path.exists('.env'):
+        print("⚠️  .env file not found. Creating template...")
+        with open('.env', 'w') as f:
+            f.write("# Scholarship Agent API Keys\n")
+            f.write("GROQ_API_KEY=your_groq_api_key_here\n")
+            f.write("TAVILY_API_KEY=your_tavily_api_key_here\n")
+        print("📝 Please edit .env file with your API keys")
+    
     # Validate environment variables
-    if not os.environ.get('GROQ_API_KEY'):
+    groq_key = os.environ.get('GROQ_API_KEY')
+    tavily_key = os.environ.get('TAVILY_API_KEY')
+    
+    if not groq_key or groq_key == 'your_groq_api_key_here':
         print("⚠️  GROQ_API_KEY environment variable is required")
         print("   Get your key from: https://console.groq.com/keys")
-    if not os.environ.get('TAVILY_API_KEY'):
+    if not tavily_key or tavily_key == 'your_tavily_api_key_here':
         print("⚠️  TAVILY_API_KEY environment variable is required")
         print("   Get your key from: https://tavily.com")
     
-    if not os.environ.get('GROQ_API_KEY') or not os.environ.get('TAVILY_API_KEY'):
+    if not groq_key or not tavily_key or groq_key == 'your_groq_api_key_here' or tavily_key == 'your_tavily_api_key_here':
         print("\n❌ Missing required API keys. Please set them in your .env file.")
+        print("Example .env file:")
+        print("GROQ_API_KEY=gsk_...")
+        print("TAVILY_API_KEY=tvly-...")
         exit(1)
     
     print("🚀 Starting Scholarship Agent API Server...")
@@ -243,5 +272,6 @@ if __name__ == "__main__":
     print(f"📖 API docs: http://localhost:8002/docs")
     print(f"🔄 Session timeout: {SESSION_TIMEOUT}")
     print(f"🌐 Frontend should connect to: http://localhost:8002")
+    print(f"✅ API Keys configured: GROQ={bool(groq_key)}, TAVILY={bool(tavily_key)}")
     
     uvicorn.run("server:app", host="0.0.0.0", port=8002, reload=True)

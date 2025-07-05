@@ -42,6 +42,7 @@ export interface ProfileResponse {
 export interface HealthResponse {
   status: string;
   timestamp: string;
+  api_keys_configured?: boolean;
 }
 
 export class ApiError extends Error {
@@ -58,6 +59,8 @@ async function makeRequest<T>(
   const url = `${API_BASE_URL}${endpoint}`;
   
   try {
+    console.log(`Making request to: ${url}`);
+    
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
@@ -65,6 +68,8 @@ async function makeRequest<T>(
       },
       ...options,
     });
+
+    console.log(`Response status: ${response.status}`);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -74,8 +79,11 @@ async function makeRequest<T>(
       );
     }
 
-    return response.json();
+    const data = await response.json();
+    console.log('Response data:', data);
+    return data;
   } catch (error) {
+    console.error('API request failed:', error);
     if (error instanceof ApiError) {
       throw error;
     }
@@ -91,6 +99,7 @@ export const api = {
       session_id: sessionId,
     };
 
+    console.log('Sending message:', request);
     return makeRequest<ChatResponse>('/chat', {
       method: 'POST',
       body: JSON.stringify(request),
