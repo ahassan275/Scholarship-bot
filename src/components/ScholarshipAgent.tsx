@@ -24,6 +24,7 @@ const ScholarshipAgent: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
 
   // API call to get agent response
   const getAgentResponse = async (userInput: string): Promise<{ response: string; newSessionId?: string }> => {
@@ -41,6 +42,7 @@ const ScholarshipAgent: React.FC = () => {
       // Update conversation state and user profile from API response
       setConversationState(result.conversation_state as ConversationState);
       setUserProfile(result.user_profile);
+      setIsConnected(true);
       
       return {
         response: result.response,
@@ -48,9 +50,14 @@ const ScholarshipAgent: React.FC = () => {
       };
     } catch (error) {
       console.error('API call failed:', error);
+      setIsConnected(false);
       
       if (error instanceof ApiError) {
-        setApiError(`API Error (${error.status}): ${error.message}`);
+        if (error.status === 0) {
+          setApiError('Unable to connect to the scholarship service. Please ensure the backend server is running on port 8002.');
+        } else {
+          setApiError(`API Error (${error.status}): ${error.message}`);
+        }
       } else {
         setApiError('Network error. Please check your connection and try again.');
       }
@@ -114,9 +121,12 @@ const ScholarshipAgent: React.FC = () => {
     const checkApiHealth = async () => {
       try {
         await api.healthCheck();
+        setIsConnected(true);
+        setApiError(null);
       } catch (error) {
         console.warn('API health check failed:', error);
-        setApiError('Unable to connect to the scholarship agent service. Please try again later.');
+        setIsConnected(false);
+        setApiError('Unable to connect to the scholarship service. Please ensure the backend server is running.');
       }
     };
     
@@ -162,6 +172,17 @@ const ScholarshipAgent: React.FC = () => {
     }
   };
 
+  const handleRetryConnection = async () => {
+    setApiError(null);
+    try {
+      await api.healthCheck();
+      setIsConnected(true);
+    } catch (error) {
+      setIsConnected(false);
+      setApiError('Still unable to connect. Please check if the backend server is running on port 8002.');
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto">
       {/* API Error Banner */}
@@ -172,12 +193,27 @@ const ScholarshipAgent: React.FC = () => {
           exit={{ opacity: 0, y: -20 }}
           className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg"
         >
-          <div className="flex items-center">
-            <div className="flex-shrink-0 w-5 h-5 text-red-500">⚠️</div>
-            <div className="ml-3">
-              <p className="text-sm font-medium">{apiError}</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 w-5 h-5 text-red-500">⚠️</div>
+              <div className="ml-3">
+                <p className="text-sm font-medium">{apiError}</p>
+                {!isConnected && (
+                  <p className="text-xs mt-1">
+                    Make sure to run: <code className="bg-red-200 px-1 rounded">python server.py</code>
+                  </p>
+                )}
+              </div>
             </div>
-            <div className="ml-auto pl-3">
+            <div className="ml-auto pl-3 flex space-x-2">
+              {!isConnected && (
+                <button
+                  onClick={handleRetryConnection}
+                  className="text-xs bg-red-200 hover:bg-red-300 px-2 py-1 rounded"
+                >
+                  Retry
+                </button>
+              )}
               <button
                 onClick={() => setApiError(null)}
                 className="inline-flex text-red-400 hover:text-red-600"
@@ -189,6 +225,24 @@ const ScholarshipAgent: React.FC = () => {
           </div>
         </motion.div>
       )}
+
+      {/* Connection Status Indicator */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="mb-4 flex items-center justify-center"
+      >
+        <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-xs ${
+          isConnected 
+            ? 'bg-green-100 text-green-700' 
+            : 'bg-red-100 text-red-700'
+        }`}>
+          <div className={`w-2 h-2 rounded-full ${
+            isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+          }`}></div>
+          <span>{isConnected ? 'Connected to AI Service' : 'Disconnected from AI Service'}</span>
+        </div>
+      </motion.div>
       
       <AnimatePresence mode="wait">
         {showWelcome ? (

@@ -50,7 +50,7 @@ fi
 echo "✅ Dependencies installed"
 
 # Start backend server in background
-echo "🔧 Starting backend server..."
+echo "🔧 Starting backend server on port 8002..."
 python server.py &
 BACKEND_PID=$!
 
@@ -64,8 +64,8 @@ FRONTEND_PID=$!
 
 echo ""
 echo "🌐 Frontend: http://localhost:5173"
-echo "🔧 Backend: http://localhost:8000"
-echo "📖 API Docs: http://localhost:8000/docs"
+echo "🔧 Backend: http://localhost:8002"
+echo "📖 API Docs: http://localhost:8002/docs"
 echo ""
 echo "📝 Make sure to set your API keys in .env file!"
 echo "   - GROQ_API_KEY: Get from https://console.groq.com/keys"

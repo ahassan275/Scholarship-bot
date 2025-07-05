@@ -51,6 +51,7 @@ class ProfileResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     timestamp: str
+    api_keys_configured: bool
 
 def cleanup_expired_sessions():
     """Remove expired sessions from memory"""
@@ -117,15 +118,25 @@ def user_profile_to_dict(profile: UserProfile) -> Dict[str, Any]:
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
+    groq_key = bool(os.environ.get('GROQ_API_KEY'))
+    tavily_key = bool(os.environ.get('TAVILY_API_KEY'))
+    
     return HealthResponse(
         status="healthy",
-        timestamp=datetime.now().isoformat()
+        timestamp=datetime.now().isoformat(),
+        api_keys_configured=groq_key and tavily_key
     )
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
     """Main chat endpoint that processes user messages"""
     try:
+        # Validate API keys
+        if not os.environ.get('GROQ_API_KEY'):
+            raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured")
+        if not os.environ.get('TAVILY_API_KEY'):
+            raise HTTPException(status_code=500, detail="TAVILY_API_KEY not configured")
+        
         # Create new session if not provided
         if not request.session_id:
             session_id = create_session()
@@ -217,13 +228,20 @@ if __name__ == "__main__":
     
     # Validate environment variables
     if not os.environ.get('GROQ_API_KEY'):
-        raise ValueError("GROQ_API_KEY environment variable is required")
+        print("⚠️  GROQ_API_KEY environment variable is required")
+        print("   Get your key from: https://console.groq.com/keys")
     if not os.environ.get('TAVILY_API_KEY'):
-        raise ValueError("TAVILY_API_KEY environment variable is required")
+        print("⚠️  TAVILY_API_KEY environment variable is required")
+        print("   Get your key from: https://tavily.com")
+    
+    if not os.environ.get('GROQ_API_KEY') or not os.environ.get('TAVILY_API_KEY'):
+        print("\n❌ Missing required API keys. Please set them in your .env file.")
+        exit(1)
     
     print("🚀 Starting Scholarship Agent API Server...")
     print(f"📊 Health check: http://localhost:8002/health")
     print(f"📖 API docs: http://localhost:8002/docs")
     print(f"🔄 Session timeout: {SESSION_TIMEOUT}")
+    print(f"🌐 Frontend should connect to: http://localhost:8002")
     
     uvicorn.run("server:app", host="0.0.0.0", port=8002, reload=True)

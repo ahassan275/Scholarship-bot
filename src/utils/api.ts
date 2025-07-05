@@ -44,7 +44,7 @@ export interface HealthResponse {
   timestamp: string;
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
     this.name = 'ApiError';
@@ -57,23 +57,31 @@ async function makeRequest<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   
-  const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  });
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new ApiError(
-      response.status,
-      errorData.detail || `HTTP ${response.status}: ${response.statusText}`
-    );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ApiError(
+        response.status,
+        errorData.detail || `HTTP ${response.status}: ${response.statusText}`
+      );
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    // Network or other errors
+    throw new ApiError(0, 'Network error: Unable to connect to the scholarship service');
   }
-
-  return response.json();
 }
 
 export const api = {
@@ -111,5 +119,3 @@ export const api = {
     return makeRequest('/sessions/stats');
   },
 };
-
-export { ApiError };
