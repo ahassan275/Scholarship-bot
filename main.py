@@ -128,13 +128,23 @@ class ScholarshipBot:
         self._extract_profile_info(user_input)
         
         if "PROFILE_COMPLETE" in response or self.user_profile.is_complete():
-            self.state = ConversationState.SEARCHING
-            return f"{response}\n\nGreat! I have enough information. Let me search for relevant scholarships for you..."
+            print("✅ Profile completed! Starting search immediately...")
+            self.state = ConversationState.RESPONDING
+            
+            # Immediately trigger search
+            search_results = self.research_agent("search for scholarships")
+            if "error" in search_results:
+                return f"{response}\n\nI encountered an error while searching: {search_results['error']}. Let me try to help based on general knowledge instead."
+            
+            search_response = self.response_agent(search_results)
+            return f"{response}\n\nGreat! I have enough information. Let me search for relevant scholarships for you...\n\n{search_response}"
         
         return response
 
     def research_agent(self, query: str) -> List[Dict[str, Any]]:
         """Agent 2: Performs live web search using Tavily"""
+        
+        print(f"🔍 Starting scholarship search for: {self.user_profile.field_of_study} student from {self.user_profile.citizenship}")
         
         # Construct citizenship-specific search queries
         citizenship_query = f"""
@@ -151,6 +161,7 @@ class ScholarshipBot:
         """
         
         try:
+            print("🔍 Searching for citizenship-specific scholarships...")
             # Primary search focused on citizenship eligibility
             citizenship_results = self.tavily_client.search(
                 query=citizenship_query,
@@ -160,7 +171,9 @@ class ScholarshipBot:
                 include_raw_content=False,
                 include_domains=None
             )
+            print(f"✅ Found {len(citizenship_results.get('results', []))} citizenship-specific scholarships")
             
+            print("🔍 Searching for location-specific scholarships...")
             # Secondary search for institution-specific scholarships
             location_results = self.tavily_client.search(
                 query=location_query,
@@ -169,7 +182,9 @@ class ScholarshipBot:
                 include_answer=True,
                 include_raw_content=False
             )
+            print(f"✅ Found {len(location_results.get('results', []))} location-specific scholarships")
             
+            print("🔍 Searching for application tips...")
             # Search for application tips
             tips_query = f"scholarship application tips {self.user_profile.field_of_study} personal statement {self.user_profile.citizenship}"
             tips_results = self.tavily_client.search(
@@ -178,6 +193,7 @@ class ScholarshipBot:
                 max_results=3,
                 include_answer=True
             )
+            print(f"✅ Found {len(tips_results.get('results', []))} application tips")
             
             # Combine results with source tracking
             all_results = {
@@ -187,15 +203,18 @@ class ScholarshipBot:
                 'user_profile': self.user_profile.to_search_context()
             }
             
+            print("🎯 Search completed! Generating response...")
             self.search_results = all_results
             return all_results
             
         except Exception as e:
-            print(f"Search error: {e}")
+            print(f"❌ Search error: {e}")
             return {"error": str(e)}
 
     def response_agent(self, search_data: Dict[str, Any]) -> str:
         """Agent 3: Synthesizes search results and provides structured response"""
+        
+        print("📝 Generating scholarship response from search results...")
         
         system_prompt = """
         You are a Response Agent for a scholarship guidance system. Your job is to synthesize search results 
@@ -241,6 +260,8 @@ class ScholarshipBot:
         )
         
         response = conversation.predict(search_context=search_context)
+        
+        print("✅ Response generated successfully!")
         
         # Set up confirmation for next steps
         self.pending_confirmation = "application_support"
@@ -300,23 +321,29 @@ class ScholarshipBot:
     def process_message(self, user_input: str) -> str:
         """Main message processing orchestrator"""
         
-        user_input = user_input.strip().lower()
+        print(f"🔄 Processing message. Current state: {self.state}")
+        print(f"📋 Profile complete: {self.user_profile.is_complete()}")
+        
+        user_input_lower = user_input.strip().lower()
         
         # Handle confirmations
         if self.pending_confirmation:
-            if user_input in ['yes', 'y', 'ok', 'sure']:
+            print(f"⏳ Handling confirmation: {self.pending_confirmation}")
+            if user_input_lower in ['yes', 'y', 'ok', 'sure']:
                 if self.pending_confirmation == "application_support":
                     self.pending_confirmation = None
                     return self._provide_application_support()
-            elif user_input in ['no', 'n', 'not now']:
+            elif user_input_lower in ['no', 'n', 'not now']:
                 self.pending_confirmation = None
                 return "No problem! Feel free to ask if you need anything else or want to search for different scholarships."
         
         # Route to appropriate agent based on current state
         if self.state == ConversationState.PROFILING:
+            print("👤 Routing to profiler agent")
             return self.profiler_agent(user_input)
             
         elif self.state == ConversationState.SEARCHING:
+            print("🔍 Routing to research agent")
             self.state = ConversationState.RESPONDING
             search_results = self.research_agent(user_input)
             if "error" in search_results:
@@ -324,6 +351,7 @@ class ScholarshipBot:
             return self.response_agent(search_results)
             
         elif self.state == ConversationState.RESPONDING:
+            print("💬 Handling follow-up questions")
             # Handle follow-up questions
             return self._handle_followup(user_input)
         
