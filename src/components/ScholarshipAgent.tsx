@@ -40,9 +40,36 @@ const ScholarshipAgent: React.FC = () => {
       }
       
       // Update conversation state and user profile from API response
-      setConversationState(result.conversation_state as ConversationState);
+      const newState = result.conversation_state as ConversationState;
+      setConversationState(newState);
       setUserProfile(result.user_profile);
       setIsConnected(true);
+      
+      // If the response indicates profile completion and transition to searching,
+      // automatically trigger the search by sending a follow-up message
+      if (newState === 'searching' && result.response.includes('PROFILE_COMPLETE')) {
+        // Wait a moment then trigger search
+        setTimeout(async () => {
+          try {
+            const searchResult = await api.sendMessage('search', result.session_id);
+            setConversationState(searchResult.conversation_state as ConversationState);
+            setUserProfile(searchResult.user_profile);
+            setIsTyping(false);
+            
+            const searchMessage: Message = {
+              id: (Date.now() + 2).toString(),
+              content: searchResult.response,
+              sender: 'agent',
+              timestamp: new Date(),
+              type: searchResult.response.includes('##') ? 'scholarship_results' : 'text',
+            };
+            setMessages(prev => [...prev, searchMessage]);
+          } catch (error) {
+            console.error('Auto-search failed:', error);
+            setIsTyping(false);
+          }
+        }, 1000);
+      }
       
       return {
         response: result.response,
@@ -81,14 +108,17 @@ const ScholarshipAgent: React.FC = () => {
       const { response } = await getAgentResponse(content);
       setIsTyping(false);
       
-      const agentMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: response,
-        sender: 'agent',
-        timestamp: new Date(),
-        type: response.includes('##') ? 'scholarship_results' : 'text',
-      };
-      setMessages(prev => [...prev, agentMessage]);
+      // Don't add the message if it contains PROFILE_COMPLETE (it will be replaced by search results)
+      if (!response.includes('PROFILE_COMPLETE')) {
+        const agentMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: response,
+          sender: 'agent',
+          timestamp: new Date(),
+          type: response.includes('##') ? 'scholarship_results' : 'text',
+        };
+        setMessages(prev => [...prev, agentMessage]);
+      }
     } catch (error) {
       setIsTyping(false);
       const errorMessage: Message = {

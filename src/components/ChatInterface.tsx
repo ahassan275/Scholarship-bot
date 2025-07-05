@@ -32,9 +32,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [messages, isTyping]);
 
   useEffect(() => {
-    // Focus input when component mounts
-    inputRef.current?.focus();
-  }, []);
+    // Focus input when component mounts or when not disabled
+    if (conversationState !== 'searching') {
+      inputRef.current?.focus();
+    }
+  }, [conversationState]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +50,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       await onSendMessage(message);
     } finally {
       setIsSubmitting(false);
-      inputRef.current?.focus();
+      // Only focus if not in searching state
+      if (conversationState !== 'searching') {
+        inputRef.current?.focus();
+      }
     }
   };
 
@@ -64,7 +69,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       case 'profiling':
         return 'Tell me about your field of study, education level, or goals...';
       case 'searching':
-        return 'Searching for scholarships...';
+        return 'Searching for scholarships... Please wait';
       case 'responding':
         return 'Ask me anything about scholarships or applications...';
       default:
@@ -77,7 +82,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       case 'profiling':
         return { text: 'Building your profile', color: 'bg-warning-500' };
       case 'searching':
-        return { text: 'Searching scholarships', color: 'bg-primary-500' };
+        return { text: 'Searching scholarships', color: 'bg-primary-500 animate-pulse' };
       case 'responding':
         return { text: 'Ready to help', color: 'bg-success-500' };
       default:
@@ -86,6 +91,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const stateIndicator = getStateIndicator();
+  const isInputDisabled = isSubmitting || conversationState === 'searching';
 
   return (
     <div className="glass-effect rounded-2xl h-full flex flex-col">
@@ -125,6 +131,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       {/* Input Area */}
       <div className="p-4 border-t border-gray-200">
+        {conversationState === 'searching' && (
+          <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse"></div>
+              <span className="text-blue-700 text-sm font-medium">
+                Searching for scholarships... This may take a moment
+              </span>
+            </div>
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="flex space-x-3">
           <div className="flex-1 relative">
             <input
@@ -134,10 +151,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder={getPlaceholderText()}
-              disabled={isSubmitting || conversationState === 'searching'}
-              className="input-field pr-12"
+              disabled={isInputDisabled}
+              className={`input-field pr-12 ${isInputDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             />
-            {inputValue && (
+            {inputValue && !isInputDisabled && (
               <motion.button
                 type="button"
                 onClick={() => setInputValue('')}
@@ -152,10 +169,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           
           <motion.button
             type="submit"
-            disabled={!inputValue.trim() || isSubmitting || conversationState === 'searching'}
+            disabled={!inputValue.trim() || isInputDisabled}
             className="btn-primary px-4 py-3 flex items-center justify-center min-w-[50px]"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: isInputDisabled ? 1 : 1.05 }}
+            whileTap={{ scale: isInputDisabled ? 1 : 0.95 }}
           >
             {isSubmitting ? (
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -166,7 +183,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         </form>
         
         <p className="text-xs text-gray-500 mt-2 text-center">
-          Press Enter to send • Shift+Enter for new line
+          {conversationState === 'searching' 
+            ? 'Please wait while I search for scholarships...'
+            : 'Press Enter to send • Shift+Enter for new line'
+          }
         </p>
       </div>
     </div>

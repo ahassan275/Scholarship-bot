@@ -1,4 +1,3 @@
-
 import os
 import json
 from typing import Dict, List, Any
@@ -207,10 +206,10 @@ class ScholarshipBot:
         3. **VERIFICATION NOTE**: Always remind users to verify eligibility on the official website
         
         RESPONSE STRUCTURE:
-        1. ** Scholarships for [User's Citizenship] Citizens** (3-5 scholarships they can actually apply for)
-        2. **Application Guidance** (specific tips for their profile and citizenship)
-        3. ** Next Steps** (concrete action items with deadlines)
-        4. ** Additional Resources** (relevant links with sources)
+        1. **🎓 Scholarships for [User's Citizenship] Citizens** (3-5 scholarships they can actually apply for)
+        2. **📝 Application Guidance** (specific tips for their profile and citizenship)
+        3. **⏰ Next Steps** (concrete action items with deadlines)
+        4. **🔗 Additional Resources** (relevant links with sources)
         
         FORMATTING RULES:
         - Each scholarship must include: Name, Amount (if available), Deadline, Eligibility, Application process
@@ -300,27 +299,40 @@ class ScholarshipBot:
     def process_message(self, user_input: str) -> str:
         """Main message processing orchestrator"""
         
-        user_input = user_input.strip().lower()
+        user_input_lower = user_input.strip().lower()
         
         # Handle confirmations
         if self.pending_confirmation:
-            if user_input in ['yes', 'y', 'ok', 'sure']:
+            if user_input_lower in ['yes', 'y', 'ok', 'sure']:
                 if self.pending_confirmation == "application_support":
                     self.pending_confirmation = None
                     return self._provide_application_support()
-            elif user_input in ['no', 'n', 'not now']:
+            elif user_input_lower in ['no', 'n', 'not now']:
                 self.pending_confirmation = None
                 return "No problem! Feel free to ask if you need anything else or want to search for different scholarships."
+        
+        # Handle automatic search trigger
+        if user_input_lower == 'search' and self.state == ConversationState.SEARCHING:
+            search_results = self.research_agent(user_input)
+            if "error" in search_results:
+                self.state = ConversationState.RESPONDING
+                return f"I encountered an error while searching: {search_results['error']}. Let me try to help based on general knowledge instead."
+            
+            self.state = ConversationState.RESPONDING
+            return self.response_agent(search_results)
         
         # Route to appropriate agent based on current state
         if self.state == ConversationState.PROFILING:
             return self.profiler_agent(user_input)
             
         elif self.state == ConversationState.SEARCHING:
-            self.state = ConversationState.RESPONDING
+            # If we're in searching state, perform the search
             search_results = self.research_agent(user_input)
             if "error" in search_results:
+                self.state = ConversationState.RESPONDING
                 return f"I encountered an error while searching: {search_results['error']}. Let me try to help based on general knowledge instead."
+            
+            self.state = ConversationState.RESPONDING
             return self.response_agent(search_results)
             
         elif self.state == ConversationState.RESPONDING:
@@ -337,11 +349,11 @@ class ScholarshipBot:
         {self.user_profile.to_search_context()}
         
         Include:
-        1. **Personal Statement Template** - customized for their field
-        2. **Application Timeline** - step-by-step with deadlines
-        3. **Document Checklist** - everything they need to prepare
-        4. **Interview Preparation** - common questions and tips
-        5. **Follow-up Strategy** - how to track applications
+        1. **📝 Personal Statement Template** - customized for their field
+        2. **📅 Application Timeline** - step-by-step with deadlines
+        3. **📋 Document Checklist** - everything they need to prepare
+        4. **🎤 Interview Preparation** - common questions and tips
+        5. **📊 Follow-up Strategy** - how to track applications
         
         Be specific and actionable.
         """
