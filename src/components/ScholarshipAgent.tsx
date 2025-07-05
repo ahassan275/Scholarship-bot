@@ -27,7 +27,7 @@ const ScholarshipAgent: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
 
   // API call to get agent response
-  const getAgentResponse = async (userInput: string): Promise<{ response: string; newSessionId?: string }> => {
+  const getAgentResponse = async (userInput: string, isRetry: boolean = false): Promise<{ response: string; newSessionId?: string }> => {
     setIsTyping(true);
     setApiError(null);
     
@@ -53,6 +53,14 @@ const ScholarshipAgent: React.FC = () => {
       setIsConnected(false);
       
       if (error instanceof ApiError) {
+        // If session not found, clear localStorage and retry with new session (only once)
+        if (error.status === 404 && error.message.includes('Session not found') && !isRetry) {
+          localStorage.removeItem('scholarship-agent-session');
+          setSessionId(null);
+          // Retry with no session ID to create a new one
+          return getAgentResponse(userInput, true);
+        }
+        
         if (error.status === 0) {
           setApiError('Unable to connect to the scholarship service. Please ensure the backend server is running on port 8002.');
         } else {
